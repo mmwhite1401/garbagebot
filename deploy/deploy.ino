@@ -13,8 +13,8 @@ int AN2 = 5;       //PIN -- PWM output (right)
 int AN1 = 6;       //PIN -- PWM output (left)
 int IN2 = 7;       //PIN -- Motor direction output (right)
 int IN1 = 8;       //PIN -- Motor direction output (left)
-int RC_R = 10;     //PIN -- RC input   (right), Channel 2
-int RC_L = 3;      //PIN -- RC input   (left), Channel 3
+int RC_R = 29;     //PIN -- RC input   (right), Channel 2
+int RC_L = 28;      //PIN -- RC input   (left), Channel 3
 int AUTOLGT = 4;  // PIN -- Automode
 int manualscoopswitch = 50; // Pin for manual scoop switch input, Switch F, Channel 5
 int pilotbutton = 52; // Pin to give the greenlight for autopath, Switch B, Channel 9
@@ -177,6 +177,9 @@ void setup() {
   }
   digitalWrite(AUTOLGT, HIGH); //warning, steerclear, setting up
   Serial.println("Light OFF");
+
+  bool scoopdigging = false;
+  bool scoopraised = false;
 }
 
 
@@ -185,88 +188,89 @@ void setup() {
 
 
 void loop() {
-  if(digitalRead(emergencystop)== HIGH || panicking == true)
+  if (digitalRead(emergencystop) == HIGH || panicking == true)
   {
     panicking = true;
 
-    
-      analogWrite(AN1, 0);
-      analogWrite(AN2, 0);
-      
-   
+
+    analogWrite(AN1, 0);
+    analogWrite(AN2, 0);
+
+
     digitalWrite(AUTOLGT, LOW);
     Serial.println("Light ON");
-    
-    if(scoopstatemem > 0)
+
+    if (scoopstatemem > 0)
     {
-    digitalWrite(leftbicep, HIGH);
-    digitalWrite(rightbicep, HIGH);
-    digitalWrite(leftforearm, HIGH);
-    digitalWrite(rightforearm, HIGH);
-    digitalWrite(armdirection, HIGH);
-    Serial.println("Panic set relays high");
-    scoopstatemem = 0; 
+      digitalWrite(leftbicep, HIGH);
+      digitalWrite(rightbicep, HIGH);
+      digitalWrite(leftforearm, HIGH);
+      digitalWrite(rightforearm, HIGH);
+      digitalWrite(armdirection, HIGH);
+      Serial.println("Panic set relays high");
+      scoopstatemem = 0;
     }
-    
+
     Serial.print("Panic!!!\n");
     delay(1000);
     return;
-  }else{
-   PWM_L = pulseIn(RC_L, HIGH); //Read left stick inputs
-   PWM_R = pulseIn(RC_R, HIGH); //Read right stick inputs
-   
-   manualscoopsignal = pulseIn(manualscoopswitch, HIGH); //read scoop mode switch
-   Serial.print("manualscoopsignal in");
-   if (manualscoopsignal > 1500)
-   {
-    Serial.print(" Scoopmode\n");
-   }else{
-    Serial.print(" Drive mode\n");
-   }
-   
-   pilotsignal = pulseIn(pilotbutton, HIGH); //read drive mode switch
-   Serial.print("pilotsignal in");
-   if (pilotsignal > 1500)
-   {
-    Serial.print("Drive Manual\n");
-   }else{
-    Serial.print("Drive Autonomous\n");
-   }
+  } else {
+    PWM_L = pulseIn(RC_L, HIGH); //Read left stick inputs
+    PWM_R = pulseIn(RC_R, HIGH); //Read right stick inputs
+
+    manualscoopsignal = pulseIn(manualscoopswitch, HIGH); //read scoop mode switch
+    Serial.print("manualscoopsignal in");
+    if (manualscoopsignal > 1500)
+    {
+      Serial.print(" Scoopmode\n");
+    } else {
+      Serial.print(" Drive mode\n");
+    }
+
+    pilotsignal = pulseIn(pilotbutton, HIGH); //read drive mode switch
+    Serial.print("pilotsignal in");
+    if (pilotsignal > 1500)
+    {
+      Serial.print("Drive Manual\n");
+    } else {
+      Serial.print("Drive Autonomous\n");
+    }
   }
-  
-  if(manualscoopsignal > 1900 && panicking == false)
+
+  if (manualscoopsignal > 1900 && panicking == false)
   {
     Serial.print("Updatescoop\n");
-      analogWrite(AN1, 0);
-      analogWrite(AN2, 0);
+    analogWrite(AN1, 0);
+    analogWrite(AN2, 0);
     manualscoop();
     return;
   }
 
-  if(pilotsignal > 1600 && panicking == false)
+  if (pilotsignal > 1600 && panicking == false)
   {
-    
-    if(scoopstatemem != 0)
+
+    if (scoopstatemem != 0)
     {
-    scoopstatemem = 0;
-    scpcontrol();
+      scoopstatemem = 0;
+      scpcontrol();
     }
     Serial.print("manualdrive\n");
     manualdrive();
     return;
   }
-  
-  if(pilotsignal < 1600){
-    scoopstatemem = 5;  //automated scoop action, but no discernable action.
+
+  if (pilotsignal < 1600) {
+    //scoopstatemem = 5;  //automated scoop action, but no discernable action.
     if (digitalRead(AUTOLGT) == HIGH)
     {
       digitalWrite(AUTOLGT, LOW);
       Serial.println("Light ON");
     }
     Serial.print("autodrive\n");
+    // delay(500); // DEBUG
     autodrive();
     return;
-  }  else{
+  }  else {
     panicking = true;
   }
 }
@@ -327,7 +331,7 @@ void manualdrive() {
   }
   else if (PWM_L < 1430 && PWM_L > 1000) //LEFT joystick is forward, map PWM values, send signal
   {
-    analogWrite(IN1, 0);
+    analogWrite(IN1, -1);
     analogWrite(AN1, map(PWM_L, 1431, 1080, 55, 255));
     Serial.println("Left Drive Forward : ");
     Serial.print(AN1); Serial.print("\n");
@@ -351,7 +355,7 @@ void manualdrive() {
   }
   else if (PWM_R < 1430 && PWM_R > 1000) //RIGHT joystick is forward,  map PWM values, send signal
   {
-    analogWrite(IN2, 0);
+    analogWrite(IN2, -1);
     analogWrite(AN2, map(PWM_R, 1431, 1080, 55, 255));
     Serial.println("Right Drive Forward : ");
     Serial.print(AN2); Serial.print("\n");
@@ -398,7 +402,6 @@ void scpcontrol() {
       digitalWrite(rightforearm, HIGH);
       digitalWrite(armdirection, LOW);
       Serial.println("BICEPS REV");
-
       break;
     case 3:
       digitalWrite(leftbicep, HIGH);
@@ -441,12 +444,12 @@ void scpcontrol() {
       Serial.println("scoop will do nothing");
       break;
   }
-  return;
 }
 
 // Emergency Stop ISR. Returns to manual control
 void panic()
 {
+  Serial.println("Panic Interrupt tripped");
   allStop();
   panicking = true;
 }
@@ -460,6 +463,7 @@ void calcIMU()
   {
     // Average compass value
     avgcomp = avgcomp * (1 - compema) + compass * compema;
+    Serial.print("Avg compass: "); Serial.println(avgcomp);
   }
 }
 
@@ -506,6 +510,7 @@ void calcPos()
   {
     digScoop();
     Serial.println("Calculating time at start of drive");
+    // delay(500); // DEBUG
     drivetime = millis();
     maxdrivetime = 10000;
     driveline = true;
@@ -519,6 +524,7 @@ void calcPos()
   else
   {
     Serial.println("Object detected, pausing drivetime");
+    // delay(500); // DEBUG
     maxdrivetime += millis() - pauseddrivetime;
   }
 
@@ -526,6 +532,7 @@ void calcPos()
   if ((millis() - drivetime) > maxdrivetime)
   {
     Serial.println("Over maxdrivetime");
+    // delay(500); // DEBUG
     driveline = false;
   }
 }
@@ -534,6 +541,7 @@ void calcPos()
 void calibrate()
 {
   Serial.println("Calibrating compass");
+  // delay(500); // DEBUG
   // Calibrate compass
   for (int index = 0; index <= 100; index++)
   {
@@ -545,6 +553,7 @@ void calibrate()
   }
 
   Serial.println("Setting path direction");
+  // delay(500); // DEBUG
   // Set path direction
   pathcompass = avgcomp;
   calibrated = true;
@@ -553,7 +562,9 @@ void calibrate()
 // Pathing Functions
 void autoPath()
 {
-  if (panicking == true);
+  Serial.println("autopath called");
+  // delay(500); // DEBUG
+  if (panicking == true)
   {
     return;
   }
@@ -561,13 +572,18 @@ void autoPath()
   if (objectdetected == true)
   {
     Serial.println("Object detected, stopping");
+    // delay(500); // DEBUG
     allStop();
     return;
   }
 
+  Serial.print("Turns is currently: "); Serial.println(turns);
+  // delay(500); // DEBUG
   // Keep going until max turns reached
   if (turns < maxturns)
   {
+    Serial.print("Driveline is currently: "); Serial.println(driveline);
+    // delay(500); // DEBUG
     // while within time bound, drive forward
     if (driveline == true)
     {
@@ -585,6 +601,8 @@ void autoPath()
       }
     }
 
+    Serial.print("Turning is currently: "); Serial.println(turning);
+    // delay(500); // DEBUG
     if (turnComplete == false && turning == true)
     {
       // Turn left or right
@@ -610,11 +628,15 @@ void autoPath()
 // Forward drive path
 void autodriveForward()
 {
-  if (panicking == true);
+  Serial.println("autodriveForward called");
+  // delay(500); // DEBUG
+  if (panicking == true)
   {
     return;
   }
   Serial.println("Auto driving forward");
+  // delay(500); // DEBUG
+  //Serial.print("Left PWM: "); Serial.print(PWM_L); Serial.print(" Right PWM: "); Serial.println(PWM_R);
   // If speed under max, increase power, constrain to PWM
   if (PWM_L < PWMMAX || PWM_R < PWMMAX)
   {
@@ -650,11 +672,13 @@ void autodriveForward()
   analogWrite(AN1, PWM_L);
   analogWrite(IN2, -1);
   analogWrite(AN2, PWM_R);
+  delay(10);
 }
 
 void allStop()
 {
   Serial.println("Stopping");
+  // delay(500); // DEBUG
   // Slowly set PWMs to 0
   while (PWM_L > 0 || PWM_R > 0)
   {
@@ -676,11 +700,14 @@ void allStop()
 
 void autoturnLeft()
 {
-  if (panicking == true);
+  Serial.println("autoturnLeft called");
+  // delay(500); // DEBUG
+  if (panicking == true)
   {
     return;
   }
   Serial.println("Auto turning left");
+  // delay(500); // DEBUG
   if ((avgcomp / pathcompass) > -0.99 || (avgcomp / pathcompass) < -1.01)
   {
 
@@ -697,6 +724,7 @@ void autoturnLeft()
   if (turnComplete == true)
   {
     Serial.println("Auto Left turn complete");
+    // delay(500); // DEBUG
     allStop();
     driveline = false;
     turning = false;
@@ -709,11 +737,14 @@ void autoturnLeft()
 
 void autoturnRight()
 {
-  if (panicking == true);
+  Serial.println("autoturnRight called");
+  // delay(500); // DEBUG
+  if (panicking == true)
   {
     return;
   }
   Serial.println("Auto turning right");
+  // delay(500); // DEBUG
   if ((avgcomp / pathcompass) > -0.99 || (avgcomp / pathcompass) < -1.01)
   {
 
@@ -730,6 +761,7 @@ void autoturnRight()
   if (turnComplete == true)
   {
     Serial.println("Auto right turn complete");
+    // delay(500); // DEBUG
     allStop();
     driveline = false;
     turning = false;
@@ -743,57 +775,60 @@ void autoturnRight()
 // Sensor functions
 void ultraSound()
 {
-  // If scoop deployed, driving, and object within 3 feet, disable greenlight
-  // Ultrasound Recording
-  // Trigger the left ultrasound pulse
-  Serial.println("Checking left ultrasound");
-  digitalWrite(ultraLtrig, LOW);
-  delayMicroseconds(2);
-  digitalWrite(ultraLtrig, HIGH);
-  delayMicroseconds(10);
-  digitalWrite(ultraLtrig, LOW);
-  // Capture the return
-  duration = pulseIn(ultraLecho, HIGH);
-  if (duration * 0.034 / 2 < 500)
-  {
+  /*
+    // If scoop deployed, driving, and object within 3 feet, disable greenlight
+    // Ultrasound Recording
+    // Trigger the left ultrasound pulse
+    Serial.println("Checking left ultrasound");
+    digitalWrite(ultraLtrig, LOW);
+    delayMicroseconds(2);
+    digitalWrite(ultraLtrig, HIGH);
+    delayMicroseconds(10);
+    digitalWrite(ultraLtrig, LOW);
+    // Capture the return
+    duration = pulseIn(ultraLecho, HIGH);
+    if (duration * 0.034 / 2 < 500)
+    {
     ultraDistanceL = duration * 0.034 / 2;
-  }
-  else
-  {
+    }
+    else
+    {
     ultraDistanceL = 500;
-  }
+    }
 
-  // Trigger the right ultrasound pulse
-  Serial.println("Checking right ultrasound");
-  digitalWrite(ultraRtrig, LOW);
-  delayMicroseconds(2);
-  digitalWrite(ultraRtrig, HIGH);
-  delayMicroseconds(10);
-  digitalWrite(ultraRtrig, LOW);
-  // Capture the return
-  duration = pulseIn(ultraRecho, HIGH);
-  if (duration * 0.034 / 2 < 500)
-  {
+    // Trigger the right ultrasound pulse
+    Serial.println("Checking right ultrasound");
+    digitalWrite(ultraRtrig, LOW);
+    delayMicroseconds(2);
+    digitalWrite(ultraRtrig, HIGH);
+    delayMicroseconds(10);
+    digitalWrite(ultraRtrig, LOW);
+    // Capture the return
+    duration = pulseIn(ultraRecho, HIGH);
+    if (duration * 0.034 / 2 < 500)
+    {
     ultraDistanceR = duration * 0.034 / 2;
-  }
-  else
-  {
+    }
+    else
+    {
     ultraDistanceR = 500;
-  }
+    }
 
-  // Calculate Ultrasound avgs
-  ultraAvgL = ultraAvgL * (1 - ultraema) + ultraDistanceL * ultraema;
-  ultraAvgR = ultraAvgR * (1 - ultraema) + ultraDistanceR * ultraema;
+    // Calculate Ultrasound avgs
+    ultraAvgL = ultraAvgL * (1 - ultraema) + ultraDistanceL * ultraema;
+    ultraAvgR = ultraAvgR * (1 - ultraema) + ultraDistanceR * ultraema;
 
-  // Detect if an object is within the specified distance and stop
-  if (ultraAvgL < ultraObstacle || ultraAvgR < ultraObstacle)
-  {
+    // Detect if an object is within the specified distance and stop
+    if (ultraAvgL < ultraObstacle || ultraAvgR < ultraObstacle)
+    {
     objectdetected = true;
-  }
-  else
-  {
+    }
+    else
+    {
     objectdetected = false;
-  }
+    }
+  */
+  objectdetected = false;
 }
 
 // Scoop Functions
@@ -801,10 +836,12 @@ void ultraSound()
 void digScoop()
 {
   Serial.println("digScoop called");
+  // delay(500); // DEBUG
   // if already digging, return
   if (scoopdigging == true && scoopraised == false)
   {
     Serial.println("Already digging");
+    // delay(500); // DEBUG
     return;
   }
 
@@ -812,10 +849,12 @@ void digScoop()
   if (scoopdigging == false && scoopraised == true)
   {
     Serial.println("Raised, resetting before dig");
+    // delay(500); // DEBUG
     resetScoop();
   }
 
   Serial.println("Lowering scoop to dig");
+  // delay(500); // DEBUG
   // placeholder for scoop deploy code
   delay(1);
 
@@ -826,10 +865,12 @@ void digScoop()
 void depositScoop()
 {
   Serial.println("depositScoop called");
+  // delay(500); // DEBUG
   // if already depositing, return
   if (scoopdigging == false && scoopraised == true)
   {
     Serial.println("Already depositing");
+    // delay(500); // DEBUG
     return;
   }
 
@@ -837,38 +878,41 @@ void depositScoop()
   if (scoopdigging == true && scoopraised == false)
   {
     Serial.println("Digging, resetting before depositing");
+    // delay(500); // DEBUG
     resetScoop();
   }
 
   Serial.println("Depositing scoop");
+  // delay(500); // DEBUG
   armtime = millis();
   while ((millis() - armtime) < 35000)
   {
-    if (panicking == true);
+    if (digitalRead(emergencystop) == HIGH || panicking == true)
     {
+      panicking = true;
       break;
     }
     scoopstate = 5;
     if (scoopstate == scoopstatemem)
     {
-      Serial.println(scoopstatemem);
-      return;
+      //Serial.println(scoopstatemem);
     } else {
       scoopstatemem = scoopstate;
       scpcontrol();
     }
   }
+  armtime = millis();
   while ((millis() - armtime) < 20000)
   {
-    if (panicking == true);
+    if (digitalRead(emergencystop) == HIGH || panicking == true)
     {
+      panicking = true;
       break;
     }
     scoopstate = 3;
     if (scoopstate == scoopstatemem)
     {
-      Serial.println(scoopstatemem);
-      return;
+      //Serial.println(scoopstatemem);
     } else {
       scoopstatemem = scoopstate;
       scpcontrol();
@@ -878,22 +922,21 @@ void depositScoop()
   scpcontrol();
   scoopraised = true;
 
-  // if in automatic mode, reset after depositing
-  if (scoopmode == true)
-  {
-    Serial.println("Resetting after depositing");
-    resetScoop();
-  }
+  Serial.println("Resetting after depositing");
+  // delay(500); // DEBUG
+  resetScoop();
 }
 
 // reset to neutral position
 void resetScoop()
 {
   Serial.println("resetscoop called");
+  // delay(500); // DEBUG
   // if already reset, return
   if (scoopdigging == false && scoopraised == false)
   {
     Serial.println("Already reset");
+    // delay(500); // DEBUG
     return;
   }
 
@@ -901,36 +944,37 @@ void resetScoop()
   if (scoopdigging == false && scoopraised == true)
   {
     Serial.println("Raised, resetting");
+    // delay(500); // DEBUG
     // 55 seconds for forearm, 35 seconds for bicep
     armtime = millis();
     while ((millis() - armtime) < 35000)
     {
-      if (panicking == true);
+      if (digitalRead(emergencystop) == HIGH || panicking == true)
       {
+        panicking = true;
         break;
       }
       scoopstate = 6;
       if (scoopstate == scoopstatemem)
       {
-        Serial.println(scoopstatemem);
-        return;
+        //Serial.println(scoopstatemem);
       } else {
         scoopstatemem = scoopstate;
         scpcontrol();
       }
     }
-
+    armtime = millis();
     while ((millis() - armtime) < 20000)
     {
-      if (panicking == true);
+      if (digitalRead(emergencystop) == HIGH || panicking == true)
       {
+        panicking = true;
         break;
       }
       scoopstate = 4;
       if (scoopstate == scoopstatemem)
       {
-        Serial.println(scoopstatemem);
-        return;
+        //Serial.println(scoopstatemem);
       } else {
         scoopstatemem = scoopstate;
         scpcontrol();
@@ -945,7 +989,8 @@ void resetScoop()
   // if digging, return to neutral
   if (scoopdigging == true && scoopraised == false)
   {
-    Serial.println("Digging, resetting");
+    Serial.println("Currently Digging, now resetting");
+    // delay(500); // DEBUG
     // placeholder for this code section
     delay(1);
 
